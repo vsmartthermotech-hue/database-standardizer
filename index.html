@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Database Standardizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAF8F3;
+    --surface: #FFFFFF;
+    --surface-2: #F4F1EA;
+    --border: #E5E1D6;
+    --border-strong: #C9C2B0;
+    --text: #1A1A1A;
+    --text-2: #5A5A55;
+    --text-3: #8C8A82;
+    --accent: #1F5C56;
+    --accent-soft: #E4EFEC;
+    --accent-text: #0E3A35;
+    --success: #2E7D5B;
+    --success-soft: #E8F2EC;
+    --warning: #B5651D;
+    --warning-soft: #FBF0E3;
+    --danger: #A33D3D;
+    --danger-soft: #F7E8E8;
+    --radius: 6px;
+    --radius-lg: 10px;
+    --shadow: 0 1px 2px rgba(0,0,0,0.04);
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  button { font-family: inherit; font-size: inherit; cursor: pointer; }
+  input, select { font-family: inherit; font-size: inherit; }
+  [hidden] { display: none !important; }
+
+  /* Top bar */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    color: var(--surface);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 14px;
+  }
+  .brand-title { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 12px; color: var(--text-3); margin-top: -2px; }
+  .topbar-actions { display: flex; gap: 8px; }
+
+  /* Step indicator */
+  .steps {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 0;
+    margin-right: 32px;
+    font-size: 13px;
+    color: var(--text-3);
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .step.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 500; }
+  .step.done { color: var(--text-2); }
+  .step-num {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--text-3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+  }
+  .step.active .step-num { background: var(--accent); color: var(--surface); }
+  .step.done .step-num { background: var(--success-soft); color: var(--success); }
+  .step.done .step-num::after { content: '✓'; font-family: var(--font-sans); }
+  .step.done .step-num span { display: none; }
+
+  /* Main container */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  /* Panel */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .panel-body { padding: 24px; }
+
+  /* Upload screen */
+  .upload-zone {
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 56px 24px;
+    text-align: center;
+    background: var(--surface-2);
+    transition: all 0.15s ease;
+    cursor: pointer;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+  .upload-icon {
+    width: 48px; height: 48px;
+    background: var(--surface);
+    border-radius: 50%;
+    margin: 0 auto 16px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    border: 1px solid var(--border);
+  }
+  .upload-icon svg { width: 22px; height: 22px; }
+  .upload-title { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+  .upload-sub { font-size: 13px; color: var(--text-2); }
+  .upload-formats { font-size: 12px; color: var(--text-3); margin-top: 12px; font-family: var(--font-mono); }
+  #file-input { display: none; }
+
+  .upload-meta {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .upload-meta-title { font-weight: 500; color: var(--text); margin-bottom: 6px; font-size: 13px; }
+
+  /* Mapping screen */
+  .mapping-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .file-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .file-badge strong { color: var(--text); font-weight: 500; }
+  .file-badge .dot { color: var(--text-3); }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+  .toggle {
+    width: 32px;
+    height: 18px;
+    background: var(--border-strong);
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: none;
+    padding: 0;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.15s;
+  }
+  .toggle.on::after { left: 16px; }
+
+  .summary-banner {
+    background: var(--accent-soft);
+    border: 1px solid #C7DDD9;
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .summary-banner-icon {
+    color: var(--accent);
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .summary-banner-text { color: var(--accent-text); }
+  .summary-banner-text strong { font-weight: 500; }
+
+  table.mapping {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    table-layout: fixed;
+  }
+  table.mapping thead { background: var(--surface-2); }
+  table.mapping th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-2);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+  }
+  table.mapping td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  table.mapping tbody tr:last-child td { border-bottom: none; }
+  table.mapping tbody tr:hover { background: var(--surface-2); }
+
+  .source-col {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
+    background: var(--surface-2);
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .source-preview { font-size: 11px; color: var(--text-3); margin-top: 4px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+  .source-preview.is-empty { font-family: var(--font-sans); font-style: italic; color: var(--text-3); }
+  .arrow {
+    color: var(--text-3);
+    text-align: center;
+    width: 24px;
+  }
+  .map-select {
+    width: 100%;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    display: block;
+    box-sizing: border-box;
+  }
+  .map-select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .map-select.mapped {
+    border-color: #B8D4CF;
+    background-color: var(--success-soft);
+    color: var(--success);
+  }
+  .map-select.skip {
+    color: var(--text-3);
+    background-color: var(--surface-2);
+  }
+  .map-select.unmapped {
+    border-color: #E5C9A3;
+    background-color: var(--warning-soft);
+    color: var(--warning);
+  }
+
+  .extra-col-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--font-mono);
+  }
+  .extra-col-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .extras-section {
+    margin-top: 24px;
+    padding: 16px 18px;
+    background: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+  }
+  .extras-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-2);
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .extras-desc {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-bottom: 12px;
+  }
+  .extras-empty {
+    font-size: 13px;
+    color: var(--text-3);
+    font-style: italic;
+  }
+
+  /* Preview screen */
+  .preview-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  table.preview {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.preview thead { background: var(--surface-2); position: sticky; top: 0; }
+  table.preview th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-2);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  table.preview th.extra-col { background: #FBF0E3; color: var(--warning); }
+  table.preview td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    font-family: var(--font-mono);
+    color: var(--text);
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  table.preview td.empty { color: var(--text-3); font-style: italic; font-family: var(--font-sans); }
+
+  .preview-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Download screen */
+  .done-screen {
+    text-align: center;
+    padding: 48px 24px;
+  }
+  .done-icon {
+    width: 64px; height: 64px;
+    background: var(--success-soft);
+    color: var(--success);
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .done-icon svg { width: 28px; height: 28px; }
+  .done-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .done-sub { font-size: 14px; color: var(--text-2); margin-bottom: 28px; }
+  .done-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+
+  /* Footer bar */
+  .footer-bar {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .footer-status {
+    font-size: 12px;
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .footer-status .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-right: 6px;
+  }
+  .status-chip.mapped { background: var(--success-soft); color: var(--success); }
+  .status-chip.unmapped { background: var(--warning-soft); color: var(--warning); }
+  .status-chip.skip { background: var(--surface); color: var(--text-3); border: 1px solid var(--border); }
+
+  .actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid transparent;
+    transition: all 0.12s ease;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--surface);
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: #174641; border-color: #174641; }
+  .btn-primary:disabled { background: var(--border-strong); border-color: var(--border-strong); cursor: not-allowed; }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .btn-secondary:hover { background: var(--surface-2); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-2);
+  }
+  .btn-ghost:hover { color: var(--text); background: var(--surface-2); }
+
+  /* Error state */
+  .error-box {
+    background: var(--danger-soft);
+    border: 1px solid #E5C9C9;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    color: var(--danger);
+    font-size: 13px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .error-box svg { flex-shrink: 0; width: 18px; height: 18px; margin-top: 1px; }
+  .error-box-title { font-weight: 500; margin-bottom: 2px; }
+
+  /* Help text under sections */
+  .section-help {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  .extra-inline-name {
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    width: 100%;
+  }
+  .extra-inline-name:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  td.name-cell { vertical-align: middle; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+
+  /* Extra columns section */
+  .extra-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .extra-arrow { color: var(--text-3); font-size: 12px; flex-shrink: 0; }
+  .extra-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-2);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .extra-tag.grouped {
+    cursor: pointer;
+    background: var(--accent-soft);
+    border-color: #C7DDD9;
+    color: var(--accent-text);
+  }
+  .extra-tag.grouped:hover { background: var(--danger-soft); border-color: #E5C9C9; color: var(--danger); }
+  .tag-x { font-size: 13px; line-height: 1; margin-left: 2px; }
+  .extra-group-tags { display: flex; flex-wrap: wrap; gap: 6px; flex-shrink: 0; }
+  .extra-group-row { align-items: flex-start; }
+
+  .combine-check-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    white-space: nowrap;
+    transition: all 0.1s;
+  }
+  .combine-check-label:hover { border-color: var(--accent); color: var(--accent-text); }
+  .combine-check-label input:checked + span { color: var(--accent-text); font-weight: 500; }
+  .combine-check-label input { accent-color: var(--accent); }
+
+  /* Include/exclude slide toggle */
+  .include-toggle {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent);
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+    padding: 0;
+  }
+  .include-toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.15s ease;
+  }
+  .include-toggle.excluded {
+    background: var(--border-strong);
+  }
+  .include-toggle.excluded::after {
+    left: 19px;
+  }
+
+  /* Sheet selector */
+  .sheet-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    cursor: pointer;
+    transition: border-color 0.12s;
+  }
+  .sheet-item:hover { border-color: var(--accent); }
+  .sheet-item input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); flex-shrink: 0; }
+  .sheet-item-info { display: flex; flex-direction: column; gap: 2px; }
+  .sheet-item-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .sheet-item-meta { font-size: 12px; color: var(--text-3); font-family: var(--font-mono); }
+
+  /* Spinner */
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--surface);
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Responsive */
+  @media (max-width: 720px) {
+    .container { padding: 20px 16px 48px; }
+    .panel-body { padding: 18px; }
+    table.mapping th:nth-child(4), table.mapping td:nth-child(4) { display: none; }
+    .source-col { max-width: 140px; }
+    .topbar { padding: 12px 16px; }
+    .steps { padding: 0 16px; }
+    .step { margin-right: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">DB</div>
+    <div>
+      <div class="brand-title">Database Standardizer</div>
+      <div class="brand-sub">Customer data normalization</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-ghost" id="reset-btn" hidden>Start over</button>
+  </div>
+</header>
+
+<nav class="steps" aria-label="Workflow steps">
+  <div class="step active" data-step="upload"><div class="step-num"><span>1</span></div> Upload</div>
+  <div class="step" data-step="mapping"><div class="step-num"><span>2</span></div> Map columns</div>
+  <div class="step" data-step="preview"><div class="step-num"><span>3</span></div> Review</div>
+  <div class="step" data-step="download"><div class="step-num"><span>4</span></div> Download</div>
+</nav>
+
+<main class="container">
+
+  <!-- Step 1: Upload -->
+  <section id="screen-upload" class="screen">
+    <div class="panel">
+      <div class="panel-body">
+        <div id="upload-zone" class="upload-zone">
+          <div class="upload-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="upload-title">Drop a file here, or click to browse</div>
+          <div class="upload-sub">Upload one database file to standardize</div>
+          <div class="upload-formats">.xlsx · .xls · .csv</div>
+          <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 1b: Sheet selector (multi-sheet files only) -->
+  <section id="screen-sheet-select" class="screen" hidden>
+    <div class="panel">
+      <div class="panel-body">
+        <div style="margin-bottom:16px;">
+          <div style="font-size:15px; font-weight:500; margin-bottom:4px;">This file has multiple sheets</div>
+          <div style="font-size:13px; color:var(--text-2);">Select the sheets you want to include. Each sheet will be mapped separately and combined into one export.</div>
+        </div>
+        <div id="sheet-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:8px;"></div>
+      </div>
+      <div class="footer-bar">
+        <div class="footer-status"><span id="sheet-select-count">0 sheets selected</span></div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="back-to-upload-from-sheets">Back</button>
+          <button class="btn btn-primary" id="start-mapping-sheets">Map selected sheets →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 2: Mapping -->
+  <section id="screen-mapping" class="screen" hidden>
+    <div class="panel">
+      <div class="panel-body">
+        <div id="error-container"></div>
+
+        <div class="mapping-header">
+          <div class="file-badge">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <strong id="file-name">file.xlsx</strong>
+            <span class="dot">·</span>
+            <span id="file-rows">0 rows</span>
+            <span class="dot">·</span>
+            <span id="file-cols">0 columns</span>
+          </div>
+          <div id="sheet-progress-badge" hidden style="font-size:12px; color:var(--text-2); background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:4px 10px;"></div>
+        </div>
+
+        <div class="summary-banner">
+          <div class="summary-banner-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L13.5 7.5L19 9L13.5 10.5L12 16L10.5 10.5L5 9L10.5 7.5L12 2Z"/></svg>
+          </div>
+          <div class="summary-banner-text">
+            <strong><span id="auto-mapped-count">0</span> of <span id="total-cols-count">0</span></strong> columns auto-matched. Review and adjust below.
+          </div>
+        </div>
+
+        <div class="section-help">
+          Pick a standard field for each column. Selecting "Add column" lets you type a custom output name right in the row. Use the toggle on the right to include or exclude a column.
+        </div>
+
+        <table class="mapping">
+          <colgroup>
+            <col style="width:22%">
+            <col style="width:3%">
+            <col style="width:45%">
+            <col style="width:30%">
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Source column</th>
+              <th></th>
+              <th>Maps to</th>
+              <th>Sample value</th>
+            </tr>
+          </thead>
+          <tbody id="mapping-rows"></tbody>
+        </table>
+
+        <div class="extras-section">
+          <div class="extras-title">Combine columns</div>
+          <div class="extras-desc">Merge multiple "Add column" entries into a single output column with a custom name. The values will be joined with a comma.</div>
+          <div id="extras-list">
+            <div class="extras-empty">No extra columns. Select "Add to output as extra" in the dropdown above to add columns.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bar">
+        <div class="footer-status">
+          <span class="status-chip mapped"><span id="status-mapped">0</span> mapped</span>
+          <span class="status-chip unmapped"><span id="status-extra">0</span> extra</span>
+          <span class="status-chip skip"><span id="status-skip">0</span> skipped</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="back-to-upload">Back</button>
+          <button class="btn btn-primary" id="continue-to-preview">Apply &amp; preview →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 3: Preview -->
+  <section id="screen-preview" class="screen" hidden>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="preview-stats">
+          <div class="stat-card">
+            <div class="stat-label">Records</div>
+            <div class="stat-value" id="prev-records">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Output columns</div>
+            <div class="stat-value" id="prev-cols">18</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Filled fields</div>
+            <div class="stat-value" id="prev-filled">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Source file</div>
+            <div class="stat-value" style="font-size: 14px; font-family: var(--font-mono); word-break: break-all;" id="prev-source">file.xlsx</div>
+          </div>
+        </div>
+
+        <div class="section-help">
+          Showing the first 5 rows of the standardized output. Empty cells will appear as blank in the file.
+        </div>
+
+        <div class="preview-table-wrap">
+          <table class="preview">
+            <thead id="preview-head"></thead>
+            <tbody id="preview-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="footer-bar">
+        <div class="footer-status">
+          <span id="preview-summary">Ready to export</span>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" id="back-to-mapping">Back to mapping</button>
+          <button class="btn btn-primary" id="download-btn">Download Excel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Step 4: Download -->
+  <section id="screen-download" class="screen" hidden>
+    <div class="panel">
+      <div class="done-screen">
+        <div class="done-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="done-title">File downloaded</div>
+        <div class="done-sub">Your standardized file is ready to use.</div>
+        <div class="done-file" id="done-file-name">output.xlsx</div>
+        <div>
+          <button class="btn btn-primary" id="process-another">Process another file</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+  const STANDARD_FIELDS = [
+    'GST Number',
+    'Company Name',
+    'Company Phone No.',
+    'Company Email',
+    'Website',
+    'Contact Person Name 1',
+    'Contact Person Designation 1',
+    'Contact Person Email ID 1',
+    'Contact Person Phone Number 1',
+    'Contact Person Name 2',
+    'Contact Person Designation 2',
+    'Contact Person Email ID 2',
+    'Contact Person Phone Number 2',
+    'Address 1',
+    'Address 2',
+    'City',
+    'State',
+    'Turnover',
+    'Type of Material Handled',
+    'Industry Category',
+    'Other Info'
+  ];
+  const SOURCE_FILE_FIELD = 'Source File Name';
+  const ALL_OUTPUT_FIELDS = [...STANDARD_FIELDS, SOURCE_FILE_FIELD];
+
+  // Mapping rules: for each standard field, list of patterns to match.
+  // Patterns are normalized (lowercase, no special chars) before comparison.
+  // Order patterns from most specific to most general within each array.
+  const MAPPING_RULES = {
+    'GST Number': [
+      'gst number', 'gst no', 'gstin no', 'gst id', 'gst identification',
+      'customer tax id', 'tax id', 'tin no', 'gstin', 'gst', 'tin',
+      'from gstin', 'to gstin', 'from gst', 'to gst'
+    ],
+    'Company Name': [
+      'company name', 'firm name', 'business name', 'organization name', 'organisation name',
+      'customer name', 'customername', 'client name', 'co name', 'co.name',
+      'from name', 'to name', 'from gstin name', 'to gstin name',
+      'company', 'customer', 'firm', 'organization', 'organisation', 'client'
+    ],
+    'Company Phone No.': [
+      'company phone', 'office phone', 'business phone', 'company main phone',
+      'company tel', 'office tel', 'business tel', 'company landline', 'landline',
+      'phone number', 'phone no', 'telephone', 'tel no', 'tel',
+      'phone', 'office number', 'company contact'
+    ],
+    'Company Email': [
+      'company email', 'official email', 'business email', 'company mail',
+      'email id', 'email address', 'e-mail address', 'e-mail id',
+      'email', 'e-mail', 'mail'
+    ],
+    'Website': [
+      'web address', 'website', 'web page', 'webpage', 'homepage',
+      'url', 'web', 'site'
+    ],
+    'Contact Person Name 1': [
+      'contact person name 1', 'contact person 1', 'contact name 1', 'contact1 name', 'contactperson1',
+      'contact person name', 'contact person', 'contact name',
+      'attention', 'attn', 'kind attention',
+      'first name', 'last name', 'middle name', 'person name', 'full name',
+      'contact', 'person', 'name'
+    ],
+    'Contact Person Designation 1': [
+      'designation 1', 'designation1', 'job title 1', 'jobtitle1', 'contact1 designation',
+      'designation', 'job title', 'job role', 'des.', 'des', 'position', 'role', 'title'
+    ],
+    'Contact Person Email ID 1': [
+      'contact person email 1', 'contact email 1', 'email 1', 'emailid1', 'email id 1', 'contactemail1',
+      'contact person email', 'contact email', 'personal email', 'secondary email'
+    ],
+    'Contact Person Phone Number 1': [
+      'mobile 1', 'mobile1', 'mobile no 1', 'mobileno1', 'contact phone 1', 'contactphone1',
+      'mobile phone', 'mobile number', 'mobile no', 'cell phone', 'cellphone', 'cell number',
+      'contact mobile', 'contact phone', 'contact number', 'contact no',
+      'direct number', 'direct phone', 'personal phone', 'mobile', 'cell', 'msisdn'
+    ],
+    'Contact Person Name 2': [
+      'contact person name 2', 'contact person 2', 'contact name 2', 'contact2 name', 'contactperson2',
+      'name 2', 'name2', 'contact 2', 'contact2'
+    ],
+    'Contact Person Designation 2': [
+      'designation 2', 'designation2', 'job title 2', 'jobtitle2', 'contact2 designation', 'des 2', 'des2'
+    ],
+    'Contact Person Email ID 2': [
+      'contact person email 2', 'contact email 2', 'email 2', 'emailid2', 'email id 2', 'contactemail2', 'e-mail 2'
+    ],
+    'Contact Person Phone Number 2': [
+      'mobile 2', 'mobile2', 'mobile no 2', 'mobileno2', 'contact phone 2', 'contactphone2',
+      'phone 2', 'phone2', 'telephone 2', 'tel 2', 'tel2', 'contact 2 phone', 'cell 2', 'cell2'
+    ],
+    'Address 1': [
+      'address line 1', 'address 1', 'addressline1', 'addressline 1',
+      'add 1', 'add1', 'addr 1', 'addr1',
+      'address line 2', 'address 2', 'addressline2', 'add 2', 'add2', 'addr2',
+      'address line 3', 'address 3', 'addressline3', 'add 3', 'add3', 'addr3',
+      'business street', 'business street 2', 'business street 3',
+      'street address', 'street',
+      'address', 'addr', 'location address', 'office address', 'registered address'
+    ],
+    'Address 2': [
+      'alternate address', 'secondary address', 'factory address',
+      'home address', 'plant address', 'works address',
+      'home street', 'home street 2', 'home street 3',
+      'other street', 'other address'
+    ],
+    'City': [
+      'city', 'business city', 'home city', 'town', 'place'
+    ],
+    'State': [
+      'state', 'business state', 'home state', 'province', 'region'
+    ],
+    'Turnover': [
+      'annual turnover', 'turnover', 'sales turnover', 'revenue',
+      'annual revenue', 'company turnover'
+    ],
+    'Type of Material Handled': [
+      'material handled', 'type of material', 'materials handled',
+      'material type', 'materials', 'material'
+    ],
+    'Industry Category': [
+      'industry category', 'industry type', 'industry segment',
+      'nature of business', 'type of industry', 'business type',
+      'business sector', 'industry', 'sector', 'category'
+    ],
+    'Other Info': [
+      'other info', 'other information', 'additional info', 'additional information', 'remarks', 'notes', 'comments'
+    ]
+  };
+
+  // Special mapping values
+  const MAP_SKIP = '__skip__';
+  const MAP_EXTRA = '__extra__';
+  const MAP_UNSET = '';
+
+  // ============================================================
+  // STATE
+  // ============================================================
+  const state = {
+    file: null,
+    fileName: '',
+    // Single-sheet fields
+    headers: [],
+    rows: [],
+    columnNonEmpty: [],
+    sampleValues: [],
+    mapping: {},
+    preSkipMapping: {},
+    extraNames: {},
+    extraGroups: {},
+    colGroup: {},
+    nextGroupId: 1,
+    // Per-field separator (default comma, can be changed to space etc.)
+    fieldSeparators: {},
+    // Multi-sheet fields
+    allSheets: [],        // [{ name, headers, rows, columnNonEmpty, sampleValues }]
+    selectedSheets: [],   // indexes into allSheets the user picked
+    currentSheetIdx: 0,   // which sheet we're currently mapping
+    sheetMappings: [],    // per-sheet mapping state [{mapping, preSkipMapping, ...}]
+    allOutputRows: [],    // accumulated rows from all processed sheets
+    isMultiSheet: false,
+    lastOutput: null
+  };
+
+  // Session memory for mappings keyed by header signature
+  const sessionMappings = {};
+
+  // ============================================================
+  // UTILITIES
+  // ============================================================
+  function normalize(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function $(id) { return document.getElementById(id); }
+
+  function showToast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  function showError(title, message) {
+    const container = $('error-container');
+    container.innerHTML = `
+      <div class="error-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div>
+          <div class="error-box-title">${title}</div>
+          <div>${message}</div>
+        </div>
+      </div>`;
+  }
+
+  function clearError() {
+    $('error-container').innerHTML = '';
+  }
+
+  // ============================================================
+  // FILE PARSING
+  // ============================================================
+  function parseSheet(aoa) {
+    if (!aoa || aoa.length === 0) return null;
+    // Detect header row
+    let headerRowIdx = 0;
+    while (headerRowIdx < aoa.length) {
+      const row = aoa[headerRowIdx];
+      const nonEmpty = row.filter(c => c !== null && c !== undefined && String(c).trim() !== '').length;
+      if (nonEmpty >= 2) break;
+      headerRowIdx++;
+    }
+    if (headerRowIdx >= aoa.length) return null;
+    let headers = aoa[headerRowIdx].map((h, i) => {
+      const s = (h === null || h === undefined) ? '' : String(h).trim();
+      return s === '' ? `Column ${i + 1}` : s;
+    });
+    let rows = aoa.slice(headerRowIdx + 1).filter(row =>
+      row.some(c => c !== null && c !== undefined && String(c).trim() !== '')
+    );
+    rows = rows.map(row => {
+      const r = row.slice(0, headers.length);
+      while (r.length < headers.length) r.push('');
+      return r.map(c => (c === null || c === undefined) ? '' : c);
+    });
+    return { headers, rows };
+  }
+
+  function parseFile(file) {
+    return new Promise((resolve, reject) => {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (['mdb', 'accdb', 'pst', 'ost', 'dbx'].includes(ext)) {
+        reject(new Error(`<strong>${ext.toUpperCase()}</strong> files can't be opened directly. Export to CSV or Excel first.`));
+        return;
+      }
+      if (!['xlsx', 'xls', 'csv', 'tsv', 'txt'].includes(ext)) {
+        reject(new Error(`File type <strong>.${ext}</strong> isn't supported. Please upload .xlsx, .xls, or .csv.`));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: false, cellNF: false, cellText: true });
+          if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            reject(new Error('The file has no readable sheets.')); return;
+          }
+          const sheets = [];
+          for (const name of workbook.SheetNames) {
+            const aoa = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', blankrows: false });
+            const parsed = parseSheet(aoa);
+            if (parsed && parsed.rows.length > 0) {
+              sheets.push({ name, headers: parsed.headers, rows: parsed.rows });
+            }
+          }
+          if (sheets.length === 0) {
+            reject(new Error('No data found in the file.')); return;
+          }
+          resolve(sheets);
+        } catch (err) {
+          console.error(err);
+          reject(new Error('Could not read the file. It may be corrupted or in an unexpected format.'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read the file.'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // ============================================================
+  // AUTO-MAPPING
+  // ============================================================
+  function autoMapColumn(sourceHeader) {
+    const normSrc = normalize(sourceHeader);
+    if (!normSrc) return null;
+
+    // Numbered suffix detection: if source ends in 1 or 2, try to match the base
+    // against contact person patterns and assign to the right numbered slot
+    const slotMatch = normSrc.match(/^(.+?)([12])$/);
+    if (slotMatch) {
+      const base = slotMatch[1];
+      const slot = slotMatch[2];
+      const contactBasePatterns = {
+        name:  ['contactpersonname','contactperson','contactname','contact','person','name','attention','attn'],
+        desig: ['designation','jobtitle','des','title','position','role'],
+        email: ['contactpersonemail','contactemail','emailid','email','mail'],
+        phone: ['mobileno','mobilenumber','mobilephone','mobile','contactphone','contactnumber','contactno','phone','tel','cell']
+      };
+      for (const [type, patterns] of Object.entries(contactBasePatterns)) {
+        for (const pat of patterns) {
+          if (base === pat || base.includes(pat) || (pat.includes(base) && base.length >= 4)) {
+            if (type === 'name')  return `Contact Person Name ${slot}`;
+            if (type === 'desig') return `Contact Person Designation ${slot}`;
+            if (type === 'email') return `Contact Person Email ID ${slot}`;
+            if (type === 'phone') return `Contact Person Phone Number ${slot}`;
+          }
+        }
+      }
+    }
+
+    let bestField = null;
+    let bestScore = 0;
+
+    for (const [field, patterns] of Object.entries(MAPPING_RULES)) {
+      for (const pattern of patterns) {
+        const normPat = normalize(pattern);
+        if (!normPat) continue;
+        let score = 0;
+        if (normSrc === normPat) {
+          score = 1000 + normPat.length;
+        } else if (normSrc.startsWith(normPat) || normSrc.endsWith(normPat)) {
+          score = 500 + normPat.length;
+        } else if (normSrc.includes(normPat)) {
+          score = 200 + normPat.length;
+        } else if (normPat.includes(normSrc) && normSrc.length >= 4) {
+          score = 100 + normSrc.length;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestField = field;
+        }
+      }
+    }
+
+    return bestScore >= 100 ? bestField : null;
+  }
+
+  function computeAutoMapping(headers) {
+    const mapping = {};
+    headers.forEach((h, i) => {
+      const field = autoMapColumn(h);
+      // Matched → map to the standard field. Unmatched → skip by default (user opts in).
+      mapping[i] = field || MAP_SKIP;
+    });
+    return mapping;
+  }
+
+  // ============================================================
+  // COLUMN ANALYSIS
+  // ============================================================
+  function analyzeColumns(headers, rows) {
+    const columnNonEmpty = headers.map(() => false);
+    const sampleValues = headers.map(() => '');
+
+    for (const row of rows) {
+      for (let i = 0; i < headers.length; i++) {
+        const v = row[i];
+        if (v !== null && v !== undefined && String(v).trim() !== '') {
+          columnNonEmpty[i] = true;
+          if (!sampleValues[i]) sampleValues[i] = String(v).trim();
+        }
+      }
+    }
+    return { columnNonEmpty, sampleValues };
+  }
+
+  // ============================================================
+  // RENDERING - MAPPING SCREEN
+  // ============================================================
+  function buildMappingDropdown(currentValue) {
+    const opts = [];
+    opts.push(`<option value="${MAP_UNSET}">— select a field —</option>`);
+    for (const field of STANDARD_FIELDS) {
+      opts.push(`<option value="${field}"${currentValue === field ? ' selected' : ''}>${field}</option>`);
+    }
+    opts.push(`<option value="${MAP_EXTRA}"${currentValue === MAP_EXTRA ? ' selected' : ''}>Add column</option>`);
+    return opts.join('');
+  }
+
+  function renderMappingTable() {
+    const tbody = $('mapping-rows');
+    const { headers, columnNonEmpty, sampleValues, mapping } = state;
+    tbody.innerHTML = '';
+
+    // Sort: mapped columns first (in template field order), unmapped/skipped at bottom (original order)
+    const indices = headers.map((_, i) => i);
+    const isMapped = i => {
+      const m = mapping[i] === undefined ? MAP_SKIP : mapping[i];
+      const effective = m === MAP_SKIP ? (state.preSkipMapping[i] || MAP_EXTRA) : m;
+      return STANDARD_FIELDS.includes(effective);
+    };
+    const fieldOrder = i => {
+      const m = mapping[i] === undefined ? MAP_SKIP : mapping[i];
+      const effective = m === MAP_SKIP ? (state.preSkipMapping[i] || MAP_EXTRA) : m;
+      const idx = STANDARD_FIELDS.indexOf(effective);
+      return idx === -1 ? 999 : idx;
+    };
+    indices.sort((a, b) => {
+      const am = isMapped(a), bm = isMapped(b);
+      if (am && !bm) return -1;
+      if (!am && bm) return 1;
+      if (am && bm) return fieldOrder(a) - fieldOrder(b); // template order within mapped group
+      return a - b; // original order within unmapped group
+    });
+
+    const mappedCount = indices.filter(isMapped).length;
+    let dividerInserted = false;
+
+    let displayedCount = 0;
+    indices.forEach((i, sortPos) => {
+      displayedCount++;
+      const header = headers[i];
+
+      // Insert a divider row between mapped and unmapped groups
+      if (!dividerInserted && sortPos === mappedCount && mappedCount > 0 && mappedCount < indices.length) {
+        dividerInserted = true;
+        const divTr = document.createElement('tr');
+        divTr.innerHTML = `<td colspan="4" style="padding: 6px 14px; background: var(--surface-2); border-bottom: 1px solid var(--border);">
+          <span style="font-size:11px; font-weight:500; text-transform:uppercase; letter-spacing:0.05em; color:var(--text-3);">
+            Additional columns — toggle on to include in export
+          </span>
+        </td>`;
+        tbody.appendChild(divTr);
+      }
+
+      const currentMap = mapping[i] === undefined ? MAP_SKIP : mapping[i];
+      const isSkipped = currentMap === MAP_SKIP;
+      const effectiveMap = isSkipped ? (state.preSkipMapping[i] || MAP_EXTRA) : currentMap;
+      const isExtra = effectiveMap === MAP_EXTRA;
+
+      let selectClass = 'map-select';
+      if (!isSkipped) {
+        if (STANDARD_FIELDS.includes(effectiveMap)) selectClass += ' mapped';
+        else if (isExtra) selectClass += ' unmapped';
+      } else {
+        selectClass += ' skip';
+      }
+
+      const sample = sampleValues[i] || '';
+      // Always ensure extraNames is populated for MAP_EXTRA cols
+      if (isExtra && !isSkipped && !state.extraNames[i]) {
+        state.extraNames[i] = header;
+      }
+      const extraName = state.extraNames[i] || header;
+
+      const tr = document.createElement('tr');
+      tr.dataset.col = i;
+      tr.style.opacity = isSkipped ? '0.4' : '1';
+
+      const isEmpty = !columnNonEmpty[i];
+      const sampleDisplay = isEmpty ? '(empty)' : (sampleValues[i] || '');
+
+      tr.innerHTML = `
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="include-toggle ${isSkipped ? 'excluded' : 'included'}" data-col="${i}" title="${isSkipped ? 'Click to include' : 'Click to exclude'}" aria-label="${isSkipped ? 'Excluded' : 'Included'}"></button>
+            <div class="source-col" title="${escapeHtml(header)}">${escapeHtml(header)}</div>
+          </div>
+        </td>
+        <td class="arrow">→</td>
+        <td>
+          <select class="${selectClass}" data-col="${i}" ${isSkipped ? 'disabled' : ''} style="width:100%;display:block;">
+            ${buildMappingDropdown(effectiveMap)}
+          </select>
+          ${isExtra && !isSkipped
+            ? `<input type="text" class="extra-inline-name" data-col="${i}" placeholder="Output column name…" style="margin-top:6px; width:100%;">`
+            : ''
+          }
+        </td>
+        <td>
+          <span class="source-preview ${isEmpty ? 'is-empty' : ''}" title="${escapeHtml(sampleDisplay)}">${escapeHtml(sampleDisplay)}</span>
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      // Set name input value directly on DOM element — the only reliable way
+      if (isExtra && !isSkipped) {
+        const inp = tr.querySelector('.extra-inline-name');
+        if (inp) inp.value = extraName;
+      }
+    }); // end indices.forEach
+
+    if (headers.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding: 24px; color: var(--text-3); font-style: italic;">No columns found in this file.</td></tr>`;
+    }
+
+    // Dropdown change handlers
+    tbody.querySelectorAll('select[data-col]').forEach(sel => {
+      sel.addEventListener('change', (e) => {
+        const col = parseInt(e.target.dataset.col, 10);
+        const newVal = e.target.value;
+        state.mapping[col] = newVal;
+        state.preSkipMapping[col] = newVal;
+        if (newVal !== MAP_EXTRA) {
+          delete state.extraNames[col];
+          const gid = state.colGroup[col];
+          if (gid) {
+            const group = state.extraGroups[gid];
+            if (group) group.cols = group.cols.filter(c => c !== col);
+            delete state.colGroup[col];
+          }
+        } else if (!state.extraNames[col]) {
+          state.extraNames[col] = state.headers[col];
+        }
+        renderMappingTable();
+        renderSeparatorPickers();
+        renderExtrasList();
+        updateFooterCounts();
+      });
+    });
+
+    // Inline name input handlers
+    tbody.querySelectorAll('.extra-inline-name').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const col = parseInt(e.target.dataset.col, 10);
+        state.extraNames[col] = e.target.value;
+      });
+    });
+
+    // Include/exclude toggle handlers
+    tbody.querySelectorAll('.include-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const col = parseInt(btn.dataset.col, 10);
+        const currentlySkipped = state.mapping[col] === MAP_SKIP;
+        if (currentlySkipped) {
+          state.mapping[col] = state.preSkipMapping[col] || MAP_EXTRA;
+          if (state.mapping[col] === MAP_EXTRA && !state.extraNames[col]) {
+            state.extraNames[col] = state.headers[col];
+          }
+        } else {
+          state.preSkipMapping[col] = state.mapping[col] || MAP_EXTRA;
+          state.mapping[col] = MAP_SKIP;
+          delete state.extraNames[col];
+        }
+        renderMappingTable();
+        renderExtrasList();
+        updateFooterCounts();
+      });
+    });
+  }
+
+  function renderExtrasList() {
+    const container = $('extras-list');
+
+    // Collect all MAP_EXTRA cols
+    const allExtras = [];
+    for (const [colStr, val] of Object.entries(state.mapping)) {
+      if (val === MAP_EXTRA) allExtras.push(parseInt(colStr, 10));
+    }
+
+    if (allExtras.length === 0) {
+      container.innerHTML = `<div class="extras-empty">No "Add column" entries yet. When you select "Add column" above, those columns appear here for combining.</div>`;
+      return;
+    }
+
+    const groupedCols = new Set(Object.keys(state.colGroup).map(Number));
+    const ungrouped = allExtras.filter(col => !groupedCols.has(col));
+    const groupIds = [...new Set(allExtras.filter(col => groupedCols.has(col)).map(col => state.colGroup[col]))];
+
+    let html = '';
+
+    // Show existing groups
+    groupIds.forEach(gid => {
+      const group = state.extraGroups[gid];
+      if (!group) return;
+      const memberCols = group.cols.filter(c => allExtras.includes(c));
+      if (memberCols.length === 0) return;
+      const tagsHtml = memberCols.map(col =>
+        `<span class="extra-tag grouped" data-group-col="${col}" title="Click × to remove from group">${escapeHtml(state.headers[col])} <span class="tag-x">×</span></span>`
+      ).join('');
+      html += `
+        <div class="extra-row extra-group-row" data-group-id="${gid}">
+          <div class="extra-group-tags">${tagsHtml}</div>
+          <span class="extra-arrow">→</span>
+          <input type="text" class="extra-col-input" data-group-name="${gid}" value="${escapeHtml(group.name)}" placeholder="Combined column name">
+          <button class="btn btn-ghost extra-exclude-btn" data-exclude-group="${gid}" style="padding:4px 10px; font-size:12px; white-space:nowrap;">Exclude all</button>
+        </div>
+      `;
+    });
+
+    // Combine button — only when 2+ ungrouped extras
+    const canCombine = ungrouped.length >= 2;
+    html += `
+      <div style="margin-top:${groupIds.length ? 12 : 0}px;">
+        <button class="btn btn-secondary" id="combine-cols-btn" style="font-size:12px; padding:6px 14px;" ${!canCombine ? 'disabled' : ''} title="${!canCombine ? 'Need at least 2 "Add column" entries to combine' : 'Combine multiple columns into one'}">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:5px;"><path d="M8 6H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/><path d="M16 6h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-3"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Combine columns
+        </button>
+      </div>
+      <div id="combine-picker" hidden style="margin-top:10px; padding:14px 16px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);">
+        <div style="font-size:12px; font-weight:500; color:var(--text-2); margin-bottom:10px;">Select columns to combine into one</div>
+        <div id="combine-checkboxes" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          ${ungrouped.map(col => `
+            <label class="combine-check-label">
+              <input type="checkbox" class="combine-cb" value="${col}">
+              <span>${escapeHtml(state.headers[col])}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="text" id="combine-name-input" placeholder="Combined column name…" class="extra-col-input" style="flex:1;">
+          <button class="btn btn-primary" id="combine-confirm-btn" style="font-size:12px; padding:6px 14px;" disabled>Create</button>
+          <button class="btn btn-ghost" id="combine-cancel-btn" style="font-size:12px; padding:6px 14px;">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
+
+    // Wire group name inputs
+    container.querySelectorAll('input[data-group-name]').forEach(input => {
+      input.addEventListener('input', e => {
+        const gid = e.target.dataset.groupName;
+        if (state.extraGroups[gid]) state.extraGroups[gid].name = e.target.value;
+      });
+    });
+
+    // Wire exclude-group buttons
+    container.querySelectorAll('[data-exclude-group]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const gid = btn.dataset.excludeGroup;
+        const group = state.extraGroups[gid];
+        if (!group) return;
+        group.cols.forEach(col => {
+          state.mapping[col] = MAP_SKIP;
+          delete state.colGroup[col];
+          delete state.extraNames[col];
+        });
+        delete state.extraGroups[gid];
+        renderMappingTable();
+        renderExtrasList();
+        updateFooterCounts();
+      });
+    });
+
+    // Wire remove-from-group (× tag)
+    container.querySelectorAll('.extra-tag.grouped').forEach(tag => {
+      tag.addEventListener('click', () => {
+        const col = parseInt(tag.dataset.groupCol, 10);
+        const gid = state.colGroup[col];
+        if (!gid) return;
+        const group = state.extraGroups[gid];
+        if (group) {
+          group.cols = group.cols.filter(c => c !== col);
+          if (group.cols.length === 0) delete state.extraGroups[gid];
+        }
+        delete state.colGroup[col];
+        state.extraNames[col] = state.headers[col];
+        renderMappingTable();
+        renderExtrasList();
+        updateFooterCounts();
+      });
+    });
+
+    // Combine button
+    const combineBtn = $('combine-cols-btn');
+    const picker = $('combine-picker');
+    const confirmBtn = $('combine-confirm-btn');
+    const cancelBtn = $('combine-cancel-btn');
+    const nameInput = $('combine-name-input');
+
+    if (combineBtn) combineBtn.addEventListener('click', () => { picker.hidden = false; combineBtn.hidden = true; nameInput.focus(); });
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { picker.hidden = true; if (combineBtn) combineBtn.hidden = false; });
+
+    container.querySelectorAll('.combine-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const checkedBoxes = [...container.querySelectorAll('.combine-cb:checked')];
+        if (confirmBtn) confirmBtn.disabled = checkedBoxes.length < 2;
+        // Auto-fill name with first selected column's name if field is still empty/default
+        if (nameInput && checkedBoxes.length === 1) {
+          const firstCol = parseInt(checkedBoxes[0].value, 10);
+          nameInput.value = state.extraNames[firstCol] || state.headers[firstCol] || '';
+        } else if (nameInput && checkedBoxes.length === 0) {
+          nameInput.value = '';
+        }
+      });
+    });
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        const checked = [...container.querySelectorAll('.combine-cb:checked')].map(cb => parseInt(cb.value, 10));
+        if (checked.length < 2) return;
+        const name = nameInput.value.trim() || checked.map(c => state.headers[c]).join(' + ');
+        const gid = String(state.nextGroupId++);
+        state.extraGroups[gid] = { name, cols: checked };
+        checked.forEach(col => {
+          state.colGroup[col] = gid;
+          delete state.extraNames[col];
+        });
+        renderMappingTable();
+        renderExtrasList();
+        updateFooterCounts();
+      });
+    }
+  }
+
+  function updateFooterCounts() {
+    let mapped = 0, extra = 0, skip = 0;
+    for (const v of Object.values(state.mapping)) {
+      if (STANDARD_FIELDS.includes(v)) mapped++;
+      else if (v === MAP_EXTRA) extra++;
+      else if (v === MAP_SKIP) skip++;
+    }
+    $('status-mapped').textContent = mapped;
+    $('status-extra').textContent = extra;
+    $('status-skip').textContent = skip;
+
+    $('auto-mapped-count').textContent = mapped;
+    $('total-cols-count').textContent = state.headers.length;
+  }
+
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // ============================================================
+  // BUILD STANDARDIZED OUTPUT
+  // ============================================================
+  function buildOutputForSheet(headers, rows, mapping, extraNames, extraGroups, colGroup, columnNonEmpty) {
+    const fieldToSources = {};
+    for (const field of STANDARD_FIELDS) fieldToSources[field] = [];
+    const allExtras = [];
+    Object.entries(mapping).forEach(([colStr, target]) => {
+      const col = parseInt(colStr, 10);
+      if (STANDARD_FIELDS.includes(target)) fieldToSources[target].push(col);
+      else if (target === MAP_EXTRA) allExtras.push(col);
+    });
+
+    const groupedCols = new Set(Object.keys(colGroup).map(Number));
+    const ungrouped = allExtras.filter(col => !groupedCols.has(col) && columnNonEmpty[col]).sort((a, b) => a - b);
+    const groupIds = [...new Set(allExtras.filter(col => groupedCols.has(col) && columnNonEmpty[col]).map(col => colGroup[col]))];
+
+    const outRows = rows.map(row => {
+      const outRow = [];
+      for (const field of STANDARD_FIELDS) {
+        const sources = fieldToSources[field];
+        const sep = state.fieldSeparators[field] !== undefined ? state.fieldSeparators[field] : ', ';
+        const parts = sources
+          .map(col => { const v = row[col]; return v === null || v === undefined ? '' : String(v).trim(); })
+          .filter(v => v !== '');
+        outRow.push(parts.join(sep));
+      }
+      outRow.push(state.fileName);
+      for (const col of ungrouped) {
+        const v = row[col]; outRow.push(v === null || v === undefined ? '' : String(v).trim());
+      }
+      for (const gid of groupIds) {
+        const group = extraGroups[gid];
+        if (!group) { outRow.push(''); continue; }
+        const sep = ', ';
+        const parts = group.cols.filter(col => columnNonEmpty[col])
+          .map(col => { const v = row[col]; return v === null || v === undefined ? '' : String(v).trim(); })
+          .filter(v => v !== '');
+        outRow.push(parts.join(sep));
+      }
+      return outRow;
+    });
+
+    const outHeaders = [...STANDARD_FIELDS, SOURCE_FILE_FIELD];
+    ungrouped.forEach(col => outHeaders.push((extraNames[col] || headers[col] || `Extra ${col+1}`).trim() || headers[col]));
+    groupIds.forEach(gid => { const g = extraGroups[gid]; outHeaders.push(g && g.name.trim() ? g.name.trim() : `Combined ${gid}`); });
+
+    return { headers: outHeaders, rows: outRows };
+  }
+
+  function buildOutput() {
+    const { headers, rows, mapping, extraNames, extraGroups, colGroup, columnNonEmpty } = state;
+    return buildOutputForSheet(headers, rows, mapping, extraNames, extraGroups, colGroup, columnNonEmpty);
+  }
+
+  function buildMultiSheetOutput() {
+    // Combine rows from all processed sheets; headers are always the same standard template
+    const outHeaders = [...STANDARD_FIELDS, SOURCE_FILE_FIELD];
+    const outRows = [];
+    state.sheetMappings.forEach((sm, idx) => {
+      const sheetIdx = state.selectedSheets[idx];
+      const sheet = state.allSheets[sheetIdx];
+      const result = buildOutputForSheet(sheet.headers, sheet.rows, sm.mapping, sm.extraNames, sm.extraGroups, sm.colGroup, sheet.columnNonEmpty);
+      // Only take standard + source file columns (first 18), ignore extras for multi-sheet
+      result.rows.forEach(row => outRows.push(row.slice(0, STANDARD_FIELDS.length + 1)));
+    });
+    return { headers: outHeaders, rows: outRows };
+  }
+
+  // ============================================================
+  // PREVIEW RENDERING
+  // ============================================================
+  function renderPreview() {
+    const output = state.lastOutput || buildOutput();
+    state.lastOutput = output;
+
+    // Stats
+    $('prev-records').textContent = output.rows.length.toLocaleString();
+    $('prev-cols').textContent = output.headers.length;
+    $('prev-source').textContent = state.fileName;
+
+    // Filled fields - count non-empty cells in the standard 17 columns (excluding source file)
+    let totalFilled = 0;
+    let totalCells = output.rows.length * STANDARD_FIELDS.length;
+    output.rows.forEach(row => {
+      for (let i = 0; i < STANDARD_FIELDS.length; i++) {
+        if (row[i] && row[i].trim()) totalFilled++;
+      }
+    });
+    const fillPct = totalCells > 0 ? Math.round((totalFilled / totalCells) * 100) : 0;
+    $('prev-filled').textContent = fillPct + '%';
+
+    // Preview table
+    const previewRows = output.rows.slice(0, 5);
+    const standardColCount = STANDARD_FIELDS.length + 1; // +1 for source file
+    const headHtml = '<tr>' + output.headers.map((h, i) =>
+      `<th${i >= standardColCount ? ' class="extra-col"' : ''}>${escapeHtml(h)}</th>`
+    ).join('') + '</tr>';
+    $('preview-head').innerHTML = headHtml;
+
+    if (previewRows.length === 0) {
+      $('preview-body').innerHTML = `<tr><td colspan="${output.headers.length}" style="text-align:center; padding: 24px; color: var(--text-3);">No data rows in this file.</td></tr>`;
+    } else {
+      $('preview-body').innerHTML = previewRows.map(row => {
+        return '<tr>' + row.map(cell => {
+          const empty = !cell || !String(cell).trim();
+          return `<td${empty ? ' class="empty"' : ''}>${empty ? '—' : escapeHtml(cell)}</td>`;
+        }).join('') + '</tr>';
+      }).join('');
+    }
+
+    const more = output.rows.length > 5 ? ` · ${(output.rows.length - 5).toLocaleString()} more rows not shown` : '';
+    $('preview-summary').textContent = `Showing first ${Math.min(5, output.rows.length)} of ${output.rows.length.toLocaleString()} rows${more}`;
+  }
+
+  // ============================================================
+  // EXPORT
+  // ============================================================
+  function exportXlsx() {
+    const output = state.lastOutput || buildOutput();
+    const aoa = [output.headers, ...output.rows];
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Set column widths heuristically
+    ws['!cols'] = output.headers.map(h => ({ wch: Math.min(Math.max(h.length + 2, 14), 40) }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Standardized');
+
+    // Build output filename
+    const base = state.fileName.replace(/\.(xlsx|xls|csv|tsv|txt)$/i, '');
+    const outName = `${base}_standardized.xlsx`;
+
+    XLSX.writeFile(wb, outName);
+    $('done-file-name').textContent = outName;
+    return outName;
+  }
+
+  // ============================================================
+  // SCREEN NAVIGATION
+  // ============================================================
+  function showScreen(name) {
+    ['upload', 'sheet-select', 'mapping', 'preview', 'download'].forEach(s => {
+      $('screen-' + s).hidden = (s !== name);
+    });
+    // Step indicator: sheet-select is between upload and mapping
+    const stepMap = { 'upload': 0, 'sheet-select': 0, 'mapping': 1, 'preview': 2, 'download': 3 };
+    const stepIdx = stepMap[name] !== undefined ? stepMap[name] : 0;
+    document.querySelectorAll('.step').forEach((el, i) => {
+      el.classList.remove('active', 'done');
+      if (i < stepIdx) el.classList.add('done');
+      else if (i === stepIdx) el.classList.add('active');
+    });
+    $('reset-btn').hidden = (name === 'upload');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetApp() {
+    Object.assign(state, {
+      file: null, fileName: '',
+      headers: [], rows: [], columnNonEmpty: [], sampleValues: [],
+      mapping: {}, preSkipMapping: {}, extraNames: {}, extraGroups: {}, colGroup: {}, nextGroupId: 1,
+      fieldSeparators: {},
+      allSheets: [], selectedSheets: [], currentSheetIdx: 0, sheetMappings: [], allOutputRows: [], isMultiSheet: false,
+      lastOutput: null
+    });
+    $('file-input').value = '';
+    clearError();
+    showScreen('upload');
+  }
+
+  // ============================================================
+  // FLOW HANDLERS
+  // ============================================================
+  async function handleFile(file) {
+    clearError();
+    state.file = file;
+    state.fileName = file.name;
+    try {
+      const zone = $('upload-zone');
+      zone.innerHTML = '<div style="padding:20px;"><span class="spinner"></span><div style="margin-top:12px;font-size:13px;color:var(--text-2);">Reading file…</div></div>';
+
+      const sheets = await parseFile(file);
+
+      // Analyse each sheet
+      sheets.forEach(s => {
+        const { columnNonEmpty, sampleValues } = analyzeColumns(s.headers, s.rows);
+        s.columnNonEmpty = columnNonEmpty;
+        s.sampleValues = sampleValues;
+      });
+      state.allSheets = sheets;
+      state.isMultiSheet = sheets.length > 1;
+
+      restoreUploadZone();
+
+      if (state.isMultiSheet) {
+        renderSheetSelector();
+        showScreen('sheet-select');
+      } else {
+        // Single sheet — go straight to mapping
+        state.selectedSheets = [0];
+        state.sheetMappings = [];
+        state.currentSheetIdx = 0;
+        loadSheetForMapping(0);
+      }
+    } catch (err) {
+      restoreUploadZone();
+      const msg = err && err.message ? err.message : String(err);
+      const zone = $('upload-zone');
+      const errBox = document.createElement('div');
+      errBox.className = 'error-box';
+      errBox.style.marginTop = '20px';
+      errBox.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><div><div class="error-box-title">Couldn't read this file</div><div>${msg}</div></div>`;
+      const existing = zone.parentElement.querySelector('.error-box');
+      if (existing) existing.remove();
+      zone.parentElement.appendChild(errBox);
+    }
+  }
+
+  function renderSheetSelector() {
+    const list = $('sheet-list');
+    list.innerHTML = state.allSheets.map((s, i) => `
+      <label class="sheet-item">
+        <input type="checkbox" class="sheet-cb" value="${i}" checked>
+        <div class="sheet-item-info">
+          <span class="sheet-item-name">${escapeHtml(s.name)}</span>
+          <span class="sheet-item-meta">${s.rows.length.toLocaleString()} rows · ${s.headers.length} columns</span>
+        </div>
+      </label>
+    `).join('');
+    const updateCount = () => {
+      const n = list.querySelectorAll('.sheet-cb:checked').length;
+      $('sheet-select-count').textContent = n === 1 ? '1 sheet selected' : `${n} sheets selected`;
+      $('start-mapping-sheets').disabled = n === 0;
+    };
+    list.querySelectorAll('.sheet-cb').forEach(cb => cb.addEventListener('change', updateCount));
+    updateCount();
+  }
+
+  function loadSheetForMapping(selIdx) {
+    // selIdx = index into state.selectedSheets
+    const sheetIdx = state.selectedSheets[selIdx];
+    const sheet = state.allSheets[sheetIdx];
+    state.headers = sheet.headers;
+    state.rows = sheet.rows;
+    state.columnNonEmpty = sheet.columnNonEmpty;
+    state.sampleValues = sheet.sampleValues;
+
+    // Check session memory
+    const sig = sheet.headers.join('||').toLowerCase();
+    if (sessionMappings[sig]) {
+      const sm = sessionMappings[sig];
+      state.mapping = { ...sm.mapping };
+      state.preSkipMapping = { ...sm.preSkipMapping };
+      state.extraNames = { ...sm.extraNames };
+      state.extraGroups = JSON.parse(JSON.stringify(sm.extraGroups || {}));
+      state.colGroup = { ...sm.colGroup };
+      state.nextGroupId = sm.nextGroupId || 1;
+      showToast('Reused mapping from a similar file in this session');
+    } else {
+      state.mapping = computeAutoMapping(sheet.headers);
+      state.preSkipMapping = {};
+      state.extraNames = {};
+      state.extraGroups = {};
+      state.colGroup = {};
+      state.nextGroupId = 1;
+      sheet.headers.forEach((h, i) => {
+        if (state.mapping[i] === MAP_SKIP) { state.preSkipMapping[i] = MAP_EXTRA; state.extraNames[i] = h; }
+      });
+    }
+
+    // Update UI
+    $('file-name').textContent = state.fileName;
+    $('file-rows').textContent = `${sheet.rows.length.toLocaleString()} row${sheet.rows.length === 1 ? '' : 's'}`;
+    const nonEmptyCount = sheet.columnNonEmpty.filter(Boolean).length;
+    $('file-cols').textContent = `${sheet.headers.length} columns (${nonEmptyCount} with data)`;
+
+    const badge = $('sheet-progress-badge');
+    if (state.isMultiSheet) {
+      badge.hidden = false;
+      badge.textContent = `Sheet ${selIdx + 1} of ${state.selectedSheets.length}: ${sheet.name}`;
+    } else {
+      badge.hidden = true;
+    }
+
+    renderMappingTable();
+    renderExtrasList();
+    updateFooterCounts();
+    renderSeparatorPickers();
+
+    // Update continue button label
+    const continueBtn = $('continue-to-preview');
+    if (state.isMultiSheet && selIdx < state.selectedSheets.length - 1) {
+      continueBtn.textContent = `Map next sheet (${selIdx + 2} of ${state.selectedSheets.length}) →`;
+    } else {
+      continueBtn.textContent = 'Apply & preview →';
+    }
+    showScreen('mapping');
+  }
+
+  // Show separator pickers for any field that has 2+ sources mapped to it
+  function renderSeparatorPickers() {
+    // Remove any existing picker rows
+    document.querySelectorAll('.sep-picker-row').forEach(el => el.remove());
+
+    const fieldToSources = {};
+    for (const field of STANDARD_FIELDS) fieldToSources[field] = [];
+    Object.entries(state.mapping).forEach(([colStr, target]) => {
+      if (STANDARD_FIELDS.includes(target)) fieldToSources[target].push(parseInt(colStr, 10));
+    });
+
+    const tbody = $('mapping-rows');
+    // After rendering, find rows for fields with 2+ sources and insert a picker row after the last one
+    const fieldLastRow = {};
+    tbody.querySelectorAll('tr[data-col]').forEach(tr => {
+      const col = parseInt(tr.dataset.col, 10);
+      const mapped = state.mapping[col];
+      if (STANDARD_FIELDS.includes(mapped) && fieldToSources[mapped].length >= 2) {
+        fieldLastRow[mapped] = tr;
+      }
+    });
+
+    Object.entries(fieldLastRow).forEach(([field, lastTr]) => {
+      const currentSep = state.fieldSeparators[field] !== undefined ? state.fieldSeparators[field] : ', ';
+      const pickerTr = document.createElement('tr');
+      pickerTr.className = 'sep-picker-row';
+      pickerTr.innerHTML = `
+        <td colspan="4" style="padding:4px 14px 10px 14px; background:var(--accent-soft);">
+          <span style="font-size:11px; color:var(--accent-text);">
+            Multiple columns mapped to <strong>${escapeHtml(field)}</strong> — separator:
+          </span>
+          <select class="sep-select" data-field="${escapeHtml(field)}" style="margin-left:8px; font-size:12px; padding:2px 6px; border:1px solid var(--border-strong); border-radius:4px; background:var(--surface);">
+            <option value=", " ${currentSep === ', ' ? 'selected' : ''}>Comma ( , )</option>
+            <option value=" " ${currentSep === ' ' ? 'selected' : ''}>Space</option>
+            <option value=" - " ${currentSep === ' - ' ? 'selected' : ''}>Hyphen ( - )</option>
+            <option value="" ${currentSep === '' ? 'selected' : ''}>None (join directly)</option>
+          </select>
+        </td>`;
+      lastTr.insertAdjacentElement('afterend', pickerTr);
+      pickerTr.querySelector('.sep-select').addEventListener('change', e => {
+        state.fieldSeparators[e.target.dataset.field] = e.target.value;
+      });
+    });
+  }
+
+  function restoreUploadZone() {
+    const zone = $('upload-zone');
+    zone.innerHTML = `
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="upload-title">Drop a file here, or click to browse</div>
+      <div class="upload-sub">Upload one database file to standardize</div>
+      <div class="upload-formats">.xlsx · .xls · .csv</div>
+      <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+    `;
+    wireUploadHandlers();
+  }
+
+  function saveSessionMapping() {
+    const sig = state.headers.join('||').toLowerCase();
+    sessionMappings[sig] = {
+      mapping: { ...state.mapping },
+      preSkipMapping: { ...state.preSkipMapping },
+      extraNames: { ...state.extraNames },
+      extraGroups: JSON.parse(JSON.stringify(state.extraGroups)),
+      colGroup: { ...state.colGroup },
+      nextGroupId: state.nextGroupId
+    };
+  }
+
+  function wireUploadHandlers() {
+    const zone = $('upload-zone');
+    const input = $('file-input');
+
+    zone.addEventListener('click', (e) => {
+      // Don't trigger if clicking on the input itself
+      if (e.target.tagName !== 'INPUT') input.click();
+    });
+
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('dragover');
+    });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+
+    input.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) handleFile(file);
+    });
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+  function init() {
+    wireUploadHandlers();
+
+    // Sheet selector buttons
+    $('back-to-upload-from-sheets').addEventListener('click', () => showScreen('upload'));
+    $('start-mapping-sheets').addEventListener('click', () => {
+      const checked = [...$('sheet-list').querySelectorAll('.sheet-cb:checked')].map(cb => parseInt(cb.value, 10));
+      if (checked.length === 0) return;
+      state.selectedSheets = checked;
+      state.sheetMappings = [];
+      state.currentSheetIdx = 0;
+      loadSheetForMapping(0);
+    });
+
+    // Navigation
+    $('back-to-upload').addEventListener('click', () => {
+      if (state.isMultiSheet) showScreen('sheet-select');
+      else showScreen('upload');
+    });
+
+    $('continue-to-preview').addEventListener('click', () => {
+      // Save current sheet mapping
+      saveSessionMapping();
+      const currentMapping = {
+        mapping: { ...state.mapping },
+        preSkipMapping: { ...state.preSkipMapping },
+        extraNames: { ...state.extraNames },
+        extraGroups: JSON.parse(JSON.stringify(state.extraGroups)),
+        colGroup: { ...state.colGroup }
+      };
+      state.sheetMappings[state.currentSheetIdx] = currentMapping;
+
+      if (state.isMultiSheet && state.currentSheetIdx < state.selectedSheets.length - 1) {
+        // More sheets to map
+        state.currentSheetIdx++;
+        loadSheetForMapping(state.currentSheetIdx);
+      } else {
+        // All sheets done — build final output and go to preview
+        const output = state.isMultiSheet ? buildMultiSheetOutput() : buildOutput();
+        state.lastOutput = output;
+        renderPreview();
+        showScreen('preview');
+      }
+    });
+
+    $('back-to-mapping').addEventListener('click', () => showScreen('mapping'));
+    $('download-btn').addEventListener('click', () => {
+      try { exportXlsx(); showScreen('download'); }
+      catch (err) { showToast('Export failed: ' + (err.message || err)); }
+    });
+    $('process-another').addEventListener('click', resetApp);
+    $('reset-btn').addEventListener('click', resetApp);
+
+    document.querySelectorAll('.step').forEach(step => {
+      step.addEventListener('click', () => {
+        const target = step.dataset.step;
+        if (!target) return;
+        if (step.classList.contains('done') || step.classList.contains('active')) {
+          if (target === 'upload') showScreen('upload');
+          else if (target === 'mapping' && state.headers.length > 0) showScreen('mapping');
+          else if (target === 'preview' && state.lastOutput) { renderPreview(); showScreen('preview'); }
+        }
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
